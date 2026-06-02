@@ -5,26 +5,26 @@ from dotenv import load_dotenv
 from contextlib import AsyncExitStack
 
 from mcp_client import MCPClient
-from core.claude import Claude
+from core.openai_client import OpenAIService
 
 from core.cli_chat import CliChat
 from core.cli import CliApp
 
 load_dotenv()
 
-# Anthropic Config
-claude_model = os.getenv("CLAUDE_MODEL", "")
-anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
+# OpenAI Config
+openai_model = os.getenv("OPENAI_MODEL", "")
+openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
 
-assert claude_model, "Error: CLAUDE_MODEL cannot be empty. Update .env"
-assert anthropic_api_key, (
-    "Error: ANTHROPIC_API_KEY cannot be empty. Update .env"
+assert openai_model, "Error: OPENAI_MODEL cannot be empty. Update .env"
+assert openai_api_key, (
+    "Error: OPENAI_API_KEY cannot be empty. Update .env"
 )
 
 
 async def main():
-    claude_service = Claude(model=claude_model)
+    openai_service = OpenAIService(model=openai_model)
 
     server_scripts = sys.argv[1:]
     clients = {}
@@ -51,7 +51,7 @@ async def main():
         chat = CliChat(
             doc_client=doc_client,
             clients=clients,
-            claude_service=claude_service,
+            claude_service=openai_service,
         )
 
         cli = CliApp(chat)

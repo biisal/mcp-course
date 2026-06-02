@@ -14,7 +14,9 @@ MCP Chat is a command-line interface application that enables interactive chat c
 1. Create or edit the `.env` file in the project root and verify that the following variables are set correctly:
 
 ```
-ANTHROPIC_API_KEY=""  # Enter your Anthropic API secret key
+OPENAI_API_KEY=""  # Enter your OpenAI (Compatible) API secret key
+OPENAI_BASE_URL=""  # Enter your OpenAI base URL
+OPENAI_MODEL=""  # Enter your OpenAI model
 ```
 
 ### Step 2: Install dependencies

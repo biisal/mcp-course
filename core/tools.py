@@ -1,14 +1,13 @@
 import json
-from typing import Optional, Literal, List
+from typing import Optional, List
 from mcp.types import CallToolResult, Tool, TextContent
 from mcp_client import MCPClient
-from anthropic.types import Message, ToolResultBlockParam
 
 
 class ToolManager:
     @classmethod
-    async def get_all_tools(cls, clients: dict[str, MCPClient]) -> list[Tool]:
-        """Gets all tools from the provided clients."""
+    async def get_all_tools(cls, clients: dict[str, MCPClient]) -> list[dict]:
+        """Gets all tools from the provided clients in OpenAI function-call format."""
         tools = []
         for client in clients.values():
             tool_models = await client.list_tools()
@@ -35,73 +34,71 @@ class ToolManager:
         return None
 
     @classmethod
-    def _build_tool_result_part(
+    def _build_tool_result_message(
         cls,
-        tool_use_id: str,
-        text: str,
-        status: Literal["success"] | Literal["error"],
-    ) -> ToolResultBlockParam:
-        """Builds a tool result part dictionary."""
+        tool_call_id: str,
+        content: str,
+    ) -> dict:
+        """Builds an OpenAI tool result message dict."""
         return {
-            "tool_use_id": tool_use_id,
-            "type": "tool_result",
-            "content": text,
-            "is_error": status == "error",
+            "role": "tool",
+            "tool_call_id": tool_call_id,
+            "content": content,
         }
 
     @classmethod
     async def execute_tool_requests(
-        cls, clients: dict[str, MCPClient], message: Message
-    ) -> List[ToolResultBlockParam]:
-        """Executes a list of tool requests against the provided clients."""
-        tool_requests = [
-            block for block in message.content if block.type == "tool_use"
-        ]
-        tool_result_blocks: list[ToolResultBlockParam] = []
-        for tool_request in tool_requests:
-            tool_use_id = tool_request.id
-            tool_name = tool_request.name
-            tool_input = tool_request.input
+        cls, clients: dict[str, MCPClient], response
+    ) -> List[dict]:
+        """Executes all tool calls from a ChatCompletion response and returns
+        a list of role=tool message dicts."""
+        message = response.choices[0].message
+        tool_calls = message.tool_calls or []
+
+        tool_result_messages: list[dict] = []
+        for tc in tool_calls:
+            tool_call_id = tc.id
+            tool_name = tc.function.name
+            try:
+                tool_input = json.loads(tc.function.arguments)
+            except json.JSONDecodeError:
+                tool_input = {}
 
             client = await cls._find_client_with_tool(
                 list(clients.values()), tool_name
             )
 
             if not client:
-                tool_result_part = cls._build_tool_result_part(
-                    tool_use_id, "Could not find that tool", "error"
+                tool_result_messages.append(
+                    cls._build_tool_result_message(
+                        tool_call_id, "Error: Could not find that tool"
+                    )
                 )
-                tool_result_blocks.append(tool_result_part)
                 continue
 
             try:
                 tool_output: CallToolResult | None = await client.call_tool(
                     tool_name, tool_input
                 )
-                items = []
-                if tool_output:
-                    items = tool_output.content
+                items = tool_output.content if tool_output else []
                 content_list = [
                     item.text for item in items if isinstance(item, TextContent)
                 ]
-                content_json = json.dumps(content_list)
-                tool_result_part = cls._build_tool_result_part(
-                    tool_use_id,
-                    content_json,
-                    "error"
-                    if tool_output and tool_output.isError
-                    else "success",
+                content_str = json.dumps(content_list)
+
+                if tool_output and tool_output.isError:
+                    content_str = f"Error: {content_str}"
+
+                tool_result_messages.append(
+                    cls._build_tool_result_message(tool_call_id, content_str)
                 )
             except Exception as e:
                 error_message = f"Error executing tool '{tool_name}': {e}"
                 print(error_message)
-                tool_result_part = cls._build_tool_result_part(
-                    tool_use_id,
-                    json.dumps({"error": error_message}),
-                    "error"
-                    if tool_output and tool_output.isError
-                    else "success",
+                tool_result_messages.append(
+                    cls._build_tool_result_message(
+                        tool_call_id, json.dumps({"error": error_message})
+                    )
                 )
 
-            tool_result_blocks.append(tool_result_part)
-        return tool_result_blocks
+        return tool_result_messages
