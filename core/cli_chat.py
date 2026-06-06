@@ -1,4 +1,5 @@
 from typing import List, Tuple
+
 from mcp.types import Prompt, PromptMessage
 
 from core.chat import Chat
@@ -26,9 +27,7 @@ class CliChat(Chat):
     async def get_doc_content(self, doc_id: str) -> str:
         return await self.doc_client.read_resource(f"docs://documents/{doc_id}")
 
-    async def get_prompt(
-        self, command: str, doc_id: str
-    ) -> list[PromptMessage]:
+    async def get_prompt(self, command: str, doc_id: str) -> list[PromptMessage]:
         return await self.doc_client.get_prompt(command, {"doc_id": doc_id})
 
     async def _extract_resources(self, query: str) -> str:
@@ -54,9 +53,7 @@ class CliChat(Chat):
         words = query.split()
         command = words[0].replace("/", "")
 
-        messages = await self.doc_client.get_prompt(
-            command, {"doc_id": words[1]}
-        )
+        messages = await self.doc_client.get_prompt(command, {"doc_id": words[1]})
 
         self.messages += convert_prompt_messages_to_message_params(messages)
         return True
@@ -137,6 +134,4 @@ def convert_prompt_message_to_message_param(
 def convert_prompt_messages_to_message_params(
     prompt_messages: List[PromptMessage],
 ) -> List[dict]:
-    return [
-        convert_prompt_message_to_message_param(msg) for msg in prompt_messages
-    ]
+    return [convert_prompt_message_to_message_param(msg) for msg in prompt_messages]

@@ -52,7 +52,7 @@ class OpenAIService:
 
         params = {
             "model": self.model,
-            "max_tokens": 8000,
+            "max_tokens": 4096,
             "messages": full_messages,
             "temperature": temperature,
         }
